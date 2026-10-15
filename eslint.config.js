@@ -9,6 +9,8 @@ export default tseslint.config(
   {
     languageOptions: { globals: globals.browser },
     rules: {
+      // noUncheckedIndexedAccess makes array reads possibly undefined; `!` marks the ones known in range.
+      '@typescript-eslint/no-non-null-assertion': 'off',
       'no-eval': 'error',
       'no-implied-eval': 'error',
       'no-new-func': 'error',
