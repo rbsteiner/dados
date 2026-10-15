@@ -14,7 +14,9 @@ export interface View {
 
 const BORDER = '#0b0c0f';
 const FIGHT = '#ff3b30';
-const SHADOW = 'rgba(0, 0, 0, 0.35)';
+const SHADOW = 'rgba(0, 0, 0, 0.38)';
+/** Light comes from the upper left, so shadows fall toward the lower right. */
+const SHADOW_DIRECTION: Point = { x: 0.9, y: 0.45 };
 
 export function render(ctx: CanvasRenderingContext2D, state: GameState, layout: HexLayout, view: View): void {
   const { width, height } = ctx.canvas;
@@ -41,7 +43,8 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, layout: 
   strokeOutlines(ctx, state, layout, () => true, BORDER, lineWidth);
   if (highlighted.size) strokeOutlines(ctx, state, layout, (t) => highlighted.has(t), FIGHT, lineWidth);
 
-  // Dice last, top to bottom, so lower stacks overlap the ones behind them.
+  // Shadows first so no shadow is ever drawn over a neighbouring stack; then dice top to bottom,
+  // so lower stacks overlap the ones behind them.
   const stacks = state.territories
     .map((t) => {
       const anchor = layout.anchor(t);
@@ -50,7 +53,9 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, layout: 
       return { at, dice: t.dice, color: colorOf(state.players[t.owner]!.color) };
     })
     .sort((a, b) => a.at.y - b.at.y);
-  for (const s of stacks) drawDice(ctx, s.at, s.dice, s.color, layout.radius);
+  ctx.fillStyle = SHADOW;
+  for (const s of stacks) for (const pile of piles(s.at, s.dice, layout.radius)) drawShadow(ctx, pile);
+  for (const s of stacks) for (const pile of piles(s.at, s.dice, layout.radius)) drawPile(ctx, pile, s.color);
 }
 
 /** Strokes every cell edge on the outline of the Territories matching `include`. */
@@ -98,53 +103,123 @@ function neighborAcrossEdge(cell: number, edge: number, width: number, height: n
   return nx >= 0 && nx < width && ny >= 0 && ny < height ? ny * width + nx : undefined;
 }
 
-/** Up to 8 cubes in two stacks of 4, the second stack in front and slightly to the right. */
-function drawDice(ctx: CanvasRenderingContext2D, at: Point, count: number, color: string, radius: number): void {
-  const size = radius * 2;
-  const rise = size * 0.55;
-  const back = { x: at.x - size * 0.22, y: at.y - size * 0.12 };
-  const front = { x: at.x + size * 0.32, y: at.y + size * 0.2 };
+interface Pile {
+  /** Front-top corner of the bottom die's top face, as used by drawDie. */
+  readonly base: Point;
+  readonly count: number;
+  /** Die size in pixels. */
+  readonly size: number;
+}
 
-  // Soft shadow under the stacks.
-  ctx.fillStyle = SHADOW;
+/** Up to 8 dice in two piles of 4: the second pile in front of the first and to its right. */
+function piles(at: Point, count: number, radius: number): Pile[] {
+  const size = radius * 2.5;
+  const back: Pile = { base: { x: at.x - size * 0.28, y: at.y - size * 0.2 }, count: Math.min(count, 4), size };
+  if (count <= 4) return [{ ...back, base: { x: at.x, y: at.y - size * 0.1 } }];
+  return [back, { base: { x: at.x + size * 0.32, y: at.y + size * 0.12 }, count: count - 4, size }];
+}
+
+/** The shadow a pile casts on the map: its footprint swept away from the light, longer for taller piles. */
+function drawShadow(ctx: CanvasRenderingContext2D, pile: Pile): void {
+  const h = pile.size / 2;
+  const q = pile.size / 4;
+  const { x, y } = pile.base;
+  const footprint: Point[] = [{ x, y }, { x: x + h, y: y + q }, { x, y: y + h }, { x: x - h, y: y + q }];
+  const length = pile.count * h * 0.6;
+  const cast = footprint.map((p) => ({ x: p.x + SHADOW_DIRECTION.x * length, y: p.y + SHADOW_DIRECTION.y * length }));
   ctx.beginPath();
-  const shadowWidth = count > 4 ? size * 0.95 : size * 0.65;
-  const shadowX = count > 4 ? (back.x + front.x) / 2 + size * 0.08 : back.x + size * 0.08;
-  const shadowY = (count > 4 ? front.y : back.y) + size * 0.42;
-  ctx.ellipse(shadowX, shadowY, shadowWidth, size * 0.26, 0, 0, Math.PI * 2);
+  addPolygon(ctx, convexHull([...footprint, ...cast]));
   ctx.fill();
+}
 
-  for (let i = 0; i < count; i++) {
-    const base = i < 4 ? back : front;
-    drawCube(ctx, base.x, base.y - (i % 4) * rise, size, color);
+function drawPile(ctx: CanvasRenderingContext2D, pile: Pile, color: string): void {
+  // Each die sits exactly on the one below (a die is h tall on screen).
+  for (let i = 0; i < pile.count; i++) drawDie(ctx, pile.base.x, pile.base.y - (i * pile.size) / 2, pile.size, color);
+}
+
+/**
+ * A die seen from above-left: (x, y) is the front corner of its top face, s its width.
+ * Faces are shaded by the upper-left light and show 1 (top), 2 (left) and 3 (right) pips,
+ * which meet at a corner on a real die.
+ */
+function drawDie(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, color: string): void {
+  const h = s / 2;
+  const q = s / 4;
+  const faces: { corners: Point[]; fill: string; center: Point; u: Point; v: Point; pips: number }[] = [
+    {
+      corners: [{ x, y: y - h }, { x: x + h, y: y - q }, { x, y }, { x: x - h, y: y - q }],
+      fill: mix(color, '#ffffff', 0.55),
+      center: { x, y: y - q },
+      u: { x: h / 2, y: q / 2 },
+      v: { x: -h / 2, y: q / 2 },
+      pips: 1,
+    },
+    {
+      corners: [{ x: x - h, y: y - q }, { x, y }, { x, y: y + h }, { x: x - h, y: y + q }],
+      fill: mix(color, '#ffffff', 0.1),
+      center: { x: x - h / 2, y: y + h / 4 },
+      u: { x: h / 2, y: q / 2 },
+      v: { x: 0, y: h / 2 },
+      pips: 2,
+    },
+    {
+      corners: [{ x, y }, { x: x + h, y: y - q }, { x: x + h, y: y + q }, { x, y: y + h }],
+      fill: mix(color, '#000000', 0.35),
+      center: { x: x + h / 2, y: y + h / 4 },
+      u: { x: h / 2, y: -q / 2 },
+      v: { x: 0, y: h / 2 },
+      pips: 3,
+    },
+  ];
+  ctx.lineWidth = Math.max(1.2, s * 0.06);
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = BORDER;
+  for (const face of faces) {
+    ctx.beginPath();
+    addPolygon(ctx, face.corners);
+    ctx.fillStyle = face.fill;
+    ctx.fill();
+    ctx.stroke();
+    if (s >= 14) drawPips(ctx, face.center, face.u, face.v, face.pips);
   }
 }
 
-function drawCube(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, color: string): void {
-  const h = s / 2;
-  const q = s / 4;
-  const top: Point[] = [{ x, y: y - h }, { x: x + h, y: y - q }, { x, y }, { x: x - h, y: y - q }];
-  const left: Point[] = [{ x: x - h, y: y - q }, { x, y }, { x, y: y + h }, { x: x - h, y: y + q }];
-  const right: Point[] = [{ x: x + h, y: y - q }, { x, y }, { x, y: y + h }, { x: x + h, y: y + q }];
-  ctx.lineWidth = Math.max(1.5, s * 0.07);
-  ctx.lineJoin = 'round';
-  ctx.strokeStyle = BORDER;
-  for (const [face, fill] of [
-    [top, mix(color, '#ffffff', 0.6)],
-    [left, color],
-    [right, mix(color, '#000000', 0.3)],
-  ] as const) {
-    ctx.beginPath();
-    addPolygon(ctx, face);
-    ctx.fillStyle = fill;
-    ctx.fill();
-    ctx.stroke();
-  }
-  // One pip on the top face.
+/** Pip positions on a face, in face coordinates from -1 to 1. */
+const PIPS: Record<number, readonly (readonly [number, number])[]> = {
+  1: [[0, 0]],
+  2: [[-0.5, -0.5], [0.5, 0.5]],
+  3: [[-0.5, -0.5], [0, 0], [0.5, 0.5]],
+};
+
+/** Draws pips on a parallelogram face given its center and half-axes `u` and `v`. */
+function drawPips(ctx: CanvasRenderingContext2D, center: Point, u: Point, v: Point, value: number): void {
+  ctx.save();
+  ctx.transform(u.x, u.y, v.x, v.y, center.x, center.y);
   ctx.fillStyle = BORDER;
   ctx.beginPath();
-  ctx.ellipse(x, y - q, s * 0.09, s * 0.05, 0, 0, Math.PI * 2);
+  const r = value === 1 ? 0.3 : 0.22;
+  for (const [a, b] of PIPS[value] ?? []) {
+    ctx.moveTo(a + r, b);
+    ctx.arc(a, b, r, 0, Math.PI * 2);
+  }
   ctx.fill();
+  ctx.restore();
+}
+
+/** Convex hull of a few points (monotone chain). */
+function convexHull(points: readonly Point[]): Point[] {
+  const sorted = [...points].sort((a, b) => a.x - b.x || a.y - b.y);
+  const cross = (o: Point, a: Point, b: Point) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const half = (list: Point[]) => {
+    const out: Point[] = [];
+    for (const p of list) {
+      while (out.length >= 2 && cross(out[out.length - 2]!, out[out.length - 1]!, p) <= 0) out.pop();
+      out.push(p);
+    }
+    out.pop();
+    return out;
+  };
+  return [...half(sorted), ...half([...sorted].reverse())];
 }
 
 /** Adds a closed polygon to the current path. */
