@@ -5,7 +5,7 @@ import { newGame } from './game/newGame';
 import { gameOutcome } from './game/outcome';
 import { MAX_PLAYERS, MIN_PLAYERS, type GameState, type TerritoryId } from './game/types';
 import { HexLayout } from './ui/geometry';
-import { PALETTE, colorOf } from './ui/palette';
+import { PALETTE, colorOf, textOn } from './ui/palette';
 import { render, type View } from './ui/render';
 import { STRINGS } from './ui/strings';
 
@@ -110,9 +110,9 @@ function randomGameCode(): number {
   return crypto.getRandomValues(new Uint32Array(1))[0]!;
 }
 
-function startGame(playerCount: number, humanColor: number): void {
+function startGame(playerCount: number, humanColor: number, gameCode = randomGameCode()): void {
   session++;
-  game = newGame({ playerCount, humanColor, gameCode: randomGameCode() });
+  game = newGame({ playerCount, humanColor, gameCode });
   view = {};
   ui.diceBar.replaceChildren();
   ui.startScreen.hidden = true;
@@ -255,6 +255,7 @@ function showRolls(before: GameState, result: AttackResult): void {
       const die = document.createElement('span');
       die.className = 'die';
       die.style.background = color;
+      die.style.color = textOn(color);
       die.textContent = String(v);
       el.append(die);
     }
@@ -303,3 +304,21 @@ function delay(ms: number): Promise<void> {
 }
 
 buildStartScreen();
+
+// Dev-only hooks for the screenshot tool; stripped from production builds.
+if (import.meta.env.DEV) {
+  Object.assign(window, {
+    __dados: {
+      start: startGame,
+      state: () => game,
+      /** Page coordinates of a Territory's dice anchor. */
+      territoryPoint(id: TerritoryId) {
+        if (!game || !layout) return undefined;
+        const p = layout.anchor(game.territories[id]!);
+        const rect = ui.canvas.getBoundingClientRect();
+        const scale = rect.width / ui.canvas.width;
+        return { x: rect.left + p.x * scale, y: rect.top + p.y * scale };
+      },
+    },
+  });
+}

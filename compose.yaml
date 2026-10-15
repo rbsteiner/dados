@@ -15,6 +15,26 @@ services:
       #   DEV_HOST=0.0.0.0 docker compose up
       - "${DEV_HOST:-127.0.0.1}:5173:5173"
     command: sh -c "npm ci && npm run dev -- --host 0.0.0.0"
+    networks:
+      default:
+        # Browsers force HTTPS for "app" (the .app TLD is HSTS-preloaded), so tools use this name.
+        aliases: [devserver]
+
+  # Dev-only headless browser: `docker compose --profile tools run --rm screenshot`
+  # writes screenshots of the running dev server to ./screenshots/.
+  screenshot:
+    profiles: [tools]
+    build:
+      context: tools
+      dockerfile: screenshot.Dockerfile
+    depends_on: [app]
+    volumes:
+      - ./tools:/work:ro
+      - ./screenshots:/screenshots
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    command: python /work/screenshot.py
 
 volumes:
   node_modules:
