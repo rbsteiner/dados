@@ -4,14 +4,11 @@ import { MAX_TERRITORIES, type GameMap } from './types';
 export const MAP_WIDTH = 30;
 export const MAP_HEIGHT = 28;
 
-const MIN_TERRITORY_CELLS = 8;
 const MIN_TARGET_CELLS = 14;
 const MAX_TARGET_CELLS = 30;
 /** Enclosed sea regions this small are filled with land. */
 const MAX_FILLED_LAKE_CELLS = 3;
 const SEA = -1;
-/** Cells turned into sea; never reused, so later Territories can't fill the hole. */
-const LAKE = -2;
 
 export interface GeneratedMap {
   readonly map: GameMap;
@@ -41,23 +38,13 @@ export function cellNeighbors(cell: number, width = MAP_WIDTH, height = MAP_HEIG
 export function generateMap(rng: Rng): GeneratedMap {
   const cells: number[] = new Array<number>(MAP_WIDTH * MAP_HEIGHT).fill(SEA);
   const territoryCells: number[][] = [];
-  let attempts = 0;
 
-  while (territoryCells.length < MAX_TERRITORIES && attempts < MAX_TERRITORIES * 4) {
-    attempts++;
-    const start = territoryCells.length === 0 ? centerCell() : pickCoastCell(cells, rng);
-    if (start === undefined) break;
-
-    const id = territoryCells.length;
-    const grown = growTerritory(cells, start, id, rng);
-    if (grown.length < MIN_TERRITORY_CELLS) {
-      for (const c of grown) cells[c] = LAKE;
-      continue;
-    }
-    territoryCells.push(grown);
+  while (territoryCells.length < MAX_TERRITORIES) {
+    const core = territoryCells.length === 0 ? coreAround(centerCell()) : pickCoastCore(cells, rng);
+    if (core === undefined) break; // no room left for a full core
+    territoryCells.push(growTerritory(cells, core, territoryCells.length, rng));
   }
 
-  for (let i = 0; i < cells.length; i++) if (cells[i] === LAKE) cells[i] = SEA;
   fillSmallLakes(cells, territoryCells, MAX_FILLED_LAKE_CELLS);
 
   return {
@@ -71,21 +58,32 @@ function centerCell(): number {
   return Math.floor(MAP_HEIGHT / 2) * MAP_WIDTH + Math.floor(MAP_WIDTH / 2);
 }
 
-/** A free cell touching existing land, so the new Territory is connected to the rest. */
-function pickCoastCell(cells: readonly number[], rng: Rng): number | undefined {
-  const coast: number[] = [];
-  for (let c = 0; c < cells.length; c++) {
-    if (cells[c] !== SEA) continue;
-    if (cellNeighbors(c).some((n) => (cells[n] ?? SEA) >= 0)) coast.push(c);
-  }
-  return coast.length ? coast[rng.int(coast.length)] : undefined;
+/** A cell and its 6 neighbours, or undefined if the cell is on the edge of the grid. */
+function coreAround(center: number): number[] | undefined {
+  const neighbors = cellNeighbors(center);
+  return neighbors.length === 6 ? [center, ...neighbors] : undefined;
 }
 
-function growTerritory(cells: number[], start: number, id: number, rng: Rng): number[] {
+/**
+ * A random free core (7 sea cells) touching existing land, so the new Territory is connected to
+ * the rest and has room for its dice. Undefined when no such core is left.
+ */
+function pickCoastCore(cells: readonly number[], rng: Rng): number[] | undefined {
+  const candidates: number[][] = [];
+  for (let c = 0; c < cells.length; c++) {
+    const core = coreAround(c);
+    if (!core || core.some((x) => cells[x] !== SEA)) continue;
+    if (core.some((x) => cellNeighbors(x).some((n) => cells[n]! >= 0))) candidates.push(core);
+  }
+  return candidates.length ? candidates[rng.int(candidates.length)] : undefined;
+}
+
+/** Claims the core, then grows compactly into free cells up to a random size. */
+function growTerritory(cells: number[], core: readonly number[], id: number, rng: Rng): number[] {
   const target = MIN_TARGET_CELLS + rng.int(MAX_TARGET_CELLS - MIN_TARGET_CELLS + 1);
-  const grown = [start];
-  cells[start] = id;
-  const frontier = new Set(cellNeighbors(start).filter((n) => cells[n] === SEA));
+  const grown = [...core];
+  for (const c of core) cells[c] = id;
+  const frontier = new Set(core.flatMap((c) => cellNeighbors(c)).filter((n) => cells[n] === SEA));
 
   while (grown.length < target && frontier.size > 0) {
     const next = pickCompact([...frontier], cells, id, rng);

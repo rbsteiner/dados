@@ -81,21 +81,15 @@ describe('newGame map shapes', () => {
     });
   });
 
-  it('makes compact Territories: most have a cell surrounded by their own cells', () => {
-    let total = 0;
-    let compact = 0;
-    for (const gameCode of codes) {
-      const { map, territories } = newGame({ ...base, gameCode });
-      for (const t of territories) {
-        total++;
-        const hasInterior = t.cells.some((c) => {
-          const n = cellNeighbors(c, map.width, map.height);
-          return n.length === 6 && n.every((x) => map.cells[x] === t.id);
-        });
-        if (hasInterior) compact++;
-      }
+  it.each(codes)('gives every Territory a core: a cell fully surrounded by its own cells (code %i)', (gameCode) => {
+    const { map, territories } = newGame({ ...base, gameCode });
+    for (const t of territories) {
+      const hasCore = t.cells.some((c) => {
+        const n = cellNeighbors(c, map.width, map.height);
+        return n.length === 6 && n.every((x) => map.cells[x] === t.id);
+      });
+      expect(hasCore, `Territory ${t.id} has no core`).toBe(true);
     }
-    expect(compact / total).toBeGreaterThan(0.9);
   });
 });
 
