@@ -93,16 +93,16 @@ ui.startForm.addEventListener('submit', (event) => {
   startGame(Number(data.get('players')), Number(data.get('color')));
 });
 
-// Escape would close the dialog and leave no way to start a new game.
-ui.endDialog.addEventListener('cancel', (event) => event.preventDefault());
+// However the end dialog closes (button, Escape…), go back to the start screen.
+ui.endDialog.addEventListener('close', backToStart);
+ui.newGame.addEventListener('click', () => ui.endDialog.close());
 
-ui.newGame.addEventListener('click', () => {
-  ui.endDialog.close();
+function backToStart(): void {
   ui.gameScreen.hidden = true;
   ui.startScreen.hidden = false;
   game = undefined;
   session++;
-});
+}
 
 // ---------- Game flow ----------
 
