@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { cellNeighbors } from './map';
 import { newGame } from './newGame';
 
 const base = { playerCount: 7, humanColor: 0, gameCode: 12345 };
@@ -52,6 +53,49 @@ describe('newGame map', () => {
       }
     }
     expect(seen.size).toBe(territories.length);
+  });
+});
+
+describe('newGame map shapes', () => {
+  it.each(codes)('has no enclosed lake of 3 cells or fewer (code %i)', (gameCode) => {
+    const { map } = newGame({ ...base, gameCode });
+    const seen = new Set<number>();
+    map.cells.forEach((owner, start) => {
+      if (owner >= 0 || seen.has(start)) return;
+      // Flood the sea region; it is a lake if it never reaches the edge of the grid.
+      const region = [start];
+      seen.add(start);
+      let touchesEdge = false;
+      for (let i = 0; i < region.length; i++) {
+        const cell = region[i]!;
+        const neighbors = cellNeighbors(cell, map.width, map.height);
+        if (neighbors.length < 6) touchesEdge = true;
+        for (const n of neighbors) {
+          if (map.cells[n]! < 0 && !seen.has(n)) {
+            seen.add(n);
+            region.push(n);
+          }
+        }
+      }
+      if (!touchesEdge) expect(region.length).toBeGreaterThan(3);
+    });
+  });
+
+  it('makes compact Territories: most have a cell surrounded by their own cells', () => {
+    let total = 0;
+    let compact = 0;
+    for (const gameCode of codes) {
+      const { map, territories } = newGame({ ...base, gameCode });
+      for (const t of territories) {
+        total++;
+        const hasInterior = t.cells.some((c) => {
+          const n = cellNeighbors(c, map.width, map.height);
+          return n.length === 6 && n.every((x) => map.cells[x] === t.id);
+        });
+        if (hasInterior) compact++;
+      }
+    }
+    expect(compact / total).toBeGreaterThan(0.9);
   });
 });
 

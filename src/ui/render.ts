@@ -113,7 +113,7 @@ interface Pile {
 
 /** Up to 8 dice in two piles of 4: the second pile in front of the first and to its right. */
 function piles(at: Point, count: number, radius: number): Pile[] {
-  const size = radius * 2.5;
+  const size = radius * 2.1;
   const back: Pile = { base: { x: at.x - size * 0.28, y: at.y - size * 0.2 }, count: Math.min(count, 4), size };
   if (count <= 4) return [{ ...back, base: { x: at.x, y: at.y - size * 0.1 } }];
   return [back, { base: { x: at.x + size * 0.32, y: at.y + size * 0.12 }, count: count - 4, size }];
@@ -234,5 +234,6 @@ function mix(a: string, b: string, t: number): string {
   const pb = parseInt(b.slice(1), 16);
   const channel = (shift: number) =>
     Math.round(((pa >> shift) & 255) * (1 - t) + ((pb >> shift) & 255) * t);
-  return `rgb(${channel(16)}, ${channel(8)}, ${channel(0)})`;
+  // Returns #rrggbb so results can be blended again (e.g. a highlighted Territory that flashes).
+  return `#${((channel(16) << 16) | (channel(8) << 8) | channel(0)).toString(16).padStart(6, '0')}`;
 }

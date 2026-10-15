@@ -7,6 +7,8 @@ export const MAP_HEIGHT = 28;
 const MIN_TERRITORY_CELLS = 8;
 const MIN_TARGET_CELLS = 14;
 const MAX_TARGET_CELLS = 30;
+/** Enclosed sea regions this small are filled with land. */
+const MAX_FILLED_LAKE_CELLS = 3;
 const SEA = -1;
 /** Cells turned into sea; never reused, so later Territories can't fill the hole. */
 const LAKE = -2;
@@ -56,6 +58,7 @@ export function generateMap(rng: Rng): GeneratedMap {
   }
 
   for (let i = 0; i < cells.length; i++) if (cells[i] === LAKE) cells[i] = SEA;
+  fillSmallLakes(cells, territoryCells, MAX_FILLED_LAKE_CELLS);
 
   return {
     map: { width: MAP_WIDTH, height: MAP_HEIGHT, cells },
@@ -85,14 +88,63 @@ function growTerritory(cells: number[], start: number, id: number, rng: Rng): nu
   const frontier = new Set(cellNeighbors(start).filter((n) => cells[n] === SEA));
 
   while (grown.length < target && frontier.size > 0) {
-    const options = [...frontier];
-    const next = options[rng.int(options.length)]!;
+    const next = pickCompact([...frontier], cells, id, rng);
     frontier.delete(next);
     cells[next] = id;
     grown.push(next);
     for (const n of cellNeighbors(next)) if (cells[n] === SEA) frontier.add(n);
   }
   return grown;
+}
+
+/**
+ * Picks the next cell to grow into, favouring cells that already touch the Territory on several
+ * sides (weight = touching sides cubed), which keeps Territories round instead of stringy.
+ */
+function pickCompact(options: readonly number[], cells: readonly number[], id: number, rng: Rng): number {
+  const weights = options.map((c) => cellNeighbors(c).filter((n) => cells[n] === id).length ** 3);
+  let roll = rng.next() * weights.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < options.length; i++) {
+    roll -= weights[i]!;
+    if (roll < 0) return options[i]!;
+  }
+  return options[options.length - 1]!;
+}
+
+/** Gives every enclosed sea region of at most `maxSize` cells to the Territory touching it most. */
+function fillSmallLakes(cells: number[], territoryCells: number[][], maxSize: number): void {
+  const seen = new Set<number>();
+  for (let start = 0; start < cells.length; start++) {
+    if (cells[start] !== SEA || seen.has(start)) continue;
+    const region = [start];
+    seen.add(start);
+    let enclosed = true;
+    for (let i = 0; i < region.length; i++) {
+      const neighbors = cellNeighbors(region[i]!);
+      if (neighbors.length < 6) enclosed = false;
+      for (const n of neighbors) {
+        if (cells[n] === SEA && !seen.has(n)) {
+          seen.add(n);
+          region.push(n);
+        }
+      }
+    }
+    if (!enclosed || region.length > maxSize) continue;
+
+    const touching = new Map<number, number>();
+    for (const c of region) {
+      for (const n of cellNeighbors(c)) {
+        const owner = cells[n]!;
+        if (owner >= 0) touching.set(owner, (touching.get(owner) ?? 0) + 1);
+      }
+    }
+    // Most touching sides wins; ties go to the lowest id so the result stays deterministic.
+    const [owner] = [...touching].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]!;
+    for (const c of region) {
+      cells[c] = owner;
+      territoryCells[owner]!.push(c);
+    }
+  }
 }
 
 function computeAdjacency(cells: readonly number[], count: number): number[][] {

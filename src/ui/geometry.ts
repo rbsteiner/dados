@@ -1,3 +1,4 @@
+import { cellNeighbors } from '../game/map';
 import type { GameMap, Territory } from '../game/types';
 
 export interface Point {
@@ -27,6 +28,8 @@ export class HexLayout {
       minY = Math.min(minY, y - 1);
       maxY = Math.max(maxY, y + 1);
     });
+    // Room above the top row for a full stack of dice (about 4 cell radii tall).
+    minY -= DICE_HEADROOM;
     const scale = Math.min((width - 2 * padding) / (maxX - minX), (height - 2 * padding) / (maxY - minY));
     this.radius = scale;
     this.originX = (width - (maxX - minX) * scale) / 2 - minX * scale;
@@ -63,16 +66,57 @@ export class HexLayout {
     return best;
   }
 
-  /** Where to draw a Territory's Dice: its cell closest to the Territory's average position. */
+  /**
+   * Where to draw a Territory's Dice: its cell farthest from any border, so the stack stays inside.
+   * Ties go to the cell closest to the Territory's average position.
+   */
   anchor(territory: Territory): Point {
+    const cached = this.anchors.get(territory.id);
+    if (cached && cached.cells === territory.cells) return cached.point;
+
+    const depth = this.depthFromBorder(territory);
     const points = territory.cells.map((c) => this.center(c));
     const avg = {
       x: points.reduce((s, p) => s + p.x, 0) / points.length,
       y: points.reduce((s, p) => s + p.y, 0) / points.length,
     };
-    return points.reduce((best, p) =>
-      (p.x - avg.x) ** 2 + (p.y - avg.y) ** 2 < (best.x - avg.x) ** 2 + (best.y - avg.y) ** 2 ? p : best,
-    );
+    let best = 0;
+    territory.cells.forEach((cell, i) => {
+      const d = depth.get(cell)!;
+      const bestDepth = depth.get(territory.cells[best]!)!;
+      const closer = (points[i]!.x - avg.x) ** 2 + (points[i]!.y - avg.y) ** 2 <
+        (points[best]!.x - avg.x) ** 2 + (points[best]!.y - avg.y) ** 2;
+      if (d > bestDepth || (d === bestDepth && closer)) best = i;
+    });
+    const point = points[best]!;
+    this.anchors.set(territory.id, { cells: territory.cells, point });
+    return point;
+  }
+
+  private readonly anchors = new Map<number, { cells: readonly number[]; point: Point }>();
+
+  /** For each cell of a Territory, how many steps it is from the nearest cell outside it. */
+  private depthFromBorder(territory: Territory): Map<number, number> {
+    const own = new Set(territory.cells);
+    const depth = new Map<number, number>();
+    const queue: number[] = [];
+    for (const cell of territory.cells) {
+      const neighbors = cellNeighbors(cell, this.map.width, this.map.height);
+      if (neighbors.length < 6 || neighbors.some((n) => !own.has(n))) {
+        depth.set(cell, 0);
+        queue.push(cell);
+      }
+    }
+    for (let i = 0; i < queue.length; i++) {
+      const cell = queue[i]!;
+      for (const n of cellNeighbors(cell, this.map.width, this.map.height)) {
+        if (own.has(n) && !depth.has(n)) {
+          depth.set(n, depth.get(cell)! + 1);
+          queue.push(n);
+        }
+      }
+    }
+    return depth;
   }
 
   private unitCenter(cell: number): Point {
@@ -83,3 +127,5 @@ export class HexLayout {
 }
 
 const SQRT3 = Math.sqrt(3);
+/** Extra space above the map, in cell radii, so stacks on the top row aren't cut off. */
+const DICE_HEADROOM = 4;

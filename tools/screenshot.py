@@ -45,6 +45,15 @@ def main() -> None:
                     elapsed = at
                     page.screenshot(path=f"/screenshots/{scheme}-{name}.png", animations="allow")
             page.close()
+        # A few more maps, to check how dice fit on different shapes.
+        page = browser.new_page(viewport={"width": 1280, "height": 960}, device_scale_factor=2,
+                                color_scheme="dark", bypass_csp=True)
+        page.goto(URL)
+        for code in (1, 2, 3):
+            page.evaluate(f"window.__dados.start(8, 0, {code})")
+            page.wait_for_timeout(300)
+            page.locator("#board").screenshot(path=f"/screenshots/map-code-{code}.png")
+        page.close()
         browser.close()
 
 
