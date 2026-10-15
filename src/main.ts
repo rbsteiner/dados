@@ -93,6 +93,9 @@ ui.startForm.addEventListener('submit', (event) => {
   startGame(Number(data.get('players')), Number(data.get('color')));
 });
 
+// Escape would close the dialog and leave no way to start a new game.
+ui.endDialog.addEventListener('cancel', (event) => event.preventDefault());
+
 ui.newGame.addEventListener('click', () => {
   ui.endDialog.close();
   ui.gameScreen.hidden = true;
@@ -141,7 +144,7 @@ async function continueTurns(): Promise<void> {
   }
 }
 
-function onBoardClick(event: PointerEvent): void {
+function onBoardClick(event: MouseEvent): void {
   if (!game || !layout || gameOutcome(game) !== 'playing') return;
   if (game.players[currentPlayer(game)]!.kind !== 'human') return;
 
@@ -175,7 +178,7 @@ function selectOrAttack(clicked: TerritoryId): void {
   refresh();
 }
 
-ui.canvas.addEventListener('pointerup', onBoardClick);
+ui.canvas.addEventListener('click', onBoardClick);
 
 ui.endTurn.addEventListener('click', () => {
   if (!game || game.players[currentPlayer(game)]!.kind !== 'human') return;
@@ -282,6 +285,18 @@ function resize(): void {
 }
 
 new ResizeObserver(resize).observe(ui.board);
+
+function watchPixelRatio(): void {
+  matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`).addEventListener(
+    'change',
+    () => {
+      resize();
+      watchPixelRatio();
+    },
+    { once: true },
+  );
+}
+watchPixelRatio();
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

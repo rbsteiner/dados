@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { attack } from './attack';
+import { attack, attackRefusal } from './attack';
 import { line, makeGame } from './testing';
 
 describe('attack', () => {
@@ -66,19 +66,25 @@ describe('attack', () => {
   });
 
   describe('refuses', () => {
-    const game = makeGame(
-      line({ owner: 0, dice: 1 }, { owner: 0, dice: 3 }, { owner: 1, dice: 2 }, { owner: 1, dice: 5 }),
-    );
+    // 0 (Human, 1 Die) – 1 (Human, 3) – 2 (Computer, 2) – 3 (Computer, 5); 4 (Computer, 2) touches only 3.
+    const game = makeGame([
+      { owner: 0, dice: 1, adjacent: [1, 4] },
+      { owner: 0, dice: 3, adjacent: [0, 2] },
+      { owner: 1, dice: 2, adjacent: [1, 3] },
+      { owner: 1, dice: 5, adjacent: [2] },
+      { owner: 1, dice: 2, adjacent: [0] },
+    ]);
     const rolls = { attacker: [6, 6, 6], defender: [1, 1] };
 
     it.each([
-      ['an Attacker with 1 Die', 0, 1],
-      ['attacking an own Territory', 1, 0],
-      ['a Defender that is not Adjacent', 1, 3],
-      ['a Territory of a Player whose turn it is not', 3, 1],
-      ['an unknown Attacker', 9, 2],
-      ['an unknown Defender', 1, 9],
-    ])('%s', (_, from, to) => {
+      ['an Attacker with 1 Die', 0, 4, /2 dice/],
+      ['attacking an own Territory', 1, 0, /own territory/],
+      ['a Defender that is not Adjacent', 1, 3, /not adjacent/],
+      ['a Territory of a Player whose turn it is not', 3, 2, /not your territory/],
+      ['an unknown Attacker', 9, 2, /unknown/],
+      ['an unknown Defender', 1, 9, /unknown/],
+    ])('%s', (_, from, to, reason) => {
+      expect(attackRefusal(game, from, to)).toMatch(reason);
       expect(() => attack(game, from, to, rolls)).toThrow(/illegal attack/i);
     });
 

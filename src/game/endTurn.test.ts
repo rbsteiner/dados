@@ -53,6 +53,18 @@ describe('endTurn', () => {
     expect(state.players[0]?.stock).toBe(64);
   });
 
+  it('caps the Reinforcement pool at 64 before placing it', () => {
+    // A group of 3 plus a Stock of 64 would be 67 Dice; 10 empty Territories have room for 70.
+    const game = makeGame(line(...Array.from({ length: 10 }, () => ({ owner: 0, dice: 1 })), { owner: 1, dice: 1 }), {
+      stocks: [64, 0],
+    });
+
+    const { state, placed } = endTurn(game);
+
+    expect(placed).toHaveLength(64);
+    expect(state.players[0]?.stock).toBe(0);
+  });
+
   it('reports which Territories received Dice, one entry per Die', () => {
     const game = makeGame(line({ owner: 0, dice: 7 }, { owner: 0, dice: 8 }, { owner: 1, dice: 1 }));
 

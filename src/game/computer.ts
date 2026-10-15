@@ -12,7 +12,7 @@ const DOMINANCE_SHARE = 0.4;
 const EQUAL_DICE_ATTACK_CHANCE = 0.9;
 
 /**
- * Normal difficulty, reproducing the original game's behaviour:
+ * Normal difficulty, behaving like the original game's Computers:
  * - when a Dominant Player exists, only Attacks involving them are considered;
  * - never attack a Territory holding more Dice;
  * - on equal Dice, attack if either side leads, otherwise 9 times in 10;

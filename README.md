@@ -17,6 +17,9 @@ docker compose run --rm app npm run lint       # lint
 docker compose run --rm app npm run build      # production build in dist/
 ```
 
+While `docker compose up` is running, use `docker compose exec app npm test` instead of `run`:
+both share `node_modules`, and the dev container reinstalls it on start.
+
 Pushes to `main` are tested and published to GitHub Pages by `.github/workflows/deploy.yml`.
 
 ## License

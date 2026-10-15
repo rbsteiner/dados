@@ -26,6 +26,7 @@ export function newGame(options: NewGameOptions): GameState {
   const rng = createRng(options.gameCode);
   const players = createPlayers(options.playerCount, options.humanColor);
   const { map, territoryCells, adjacency } = generateMap(rng);
+  if (territoryCells.length < players.length) throw new Error('Generated map has fewer Territories than Players');
 
   const owners = dealTerritories(territoryCells.length, players.length, rng);
   const dice = dealStartingDice(owners, players.length, rng);

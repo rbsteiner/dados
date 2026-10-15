@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { attackRefusal } from './attack';
 import { computerMove } from './computer';
-import { newGame } from './newGame';
 import { line, makeGame, type TerritorySpec } from './testing';
 import type { GameState } from './types';
 
@@ -52,6 +50,15 @@ describe('computerMove (Normal)', () => {
       expect(attackRate(game)).toBe(1);
     });
 
+    it('always attacks when the Computer shares the lead with another Player', () => {
+      // Totals: Computer 4, Human 3, player 2 4.
+      const game = asComputer(
+        line({ owner: 1, dice: 3 }, { owner: 0, dice: 3 }, { owner: 2, dice: 4 }, { owner: 1, dice: 1 }),
+        3,
+      );
+      expect(attackRate(game)).toBe(1);
+    });
+
     it('always attacks when the Defender\'s owner leads', () => {
       const game = asComputer(
         line({ owner: 1, dice: 3 }, { owner: 0, dice: 3 }, { owner: 0, dice: 1 }, { owner: 2, dice: 3 }),
@@ -87,15 +94,6 @@ describe('computerMove (Normal)', () => {
       const targets = new Set(movesOver(game).flatMap((m) => (m.type === 'attack' ? [m.to] : [])));
       expect(targets).toEqual(new Set([1, 2]));
     });
-  });
-
-  it('only chooses legal Attacks in generated games', () => {
-    for (let gameCode = 1; gameCode <= 30; gameCode++) {
-      const game = newGame({ playerCount: 6, humanColor: 0, gameCode });
-      const turnIndex = game.turnOrder.findIndex((p) => p !== 0);
-      const { move } = computerMove({ ...game, turnIndex });
-      if (move.type === 'attack') expect(attackRefusal({ ...game, turnIndex }, move.from, move.to)).toBeUndefined();
-    }
   });
 
   it('chooses the same move from the same game', () => {

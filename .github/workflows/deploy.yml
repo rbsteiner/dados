@@ -11,8 +11,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: pages-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.ref }}
+  # Never cancel a Pages deployment halfway; only superseded pull request runs.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
