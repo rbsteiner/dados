@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Proyecto Dados Clonados Belicosos</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <header>
+      <h1 id="title"></h1>
+    </header>
+
+    <main>
+      <section id="start-screen">
+        <form id="start-form">
+          <fieldset>
+            <legend id="players-label"></legend>
+            <div id="player-count" class="choices"></div>
+          </fieldset>
+          <fieldset>
+            <legend id="color-label"></legend>
+            <div id="color-choice" class="choices"></div>
+          </fieldset>
+          <button type="submit" id="play-button" class="primary"></button>
+        </form>
+      </section>
+
+      <section id="game-screen" hidden>
+        <ol id="player-bar"></ol>
+        <p id="status" aria-live="polite"></p>
+        <div id="board">
+          <canvas id="map"></canvas>
+        </div>
+        <div id="dice-bar" aria-live="polite"></div>
+        <button type="button" id="end-turn" class="primary"></button>
+      </section>
+
+      <dialog id="end-dialog">
+        <p id="end-message"></p>
+        <button type="button" id="new-game" class="primary"></button>
+      </dialog>
+    </main>
+
+    <footer>
+      <a id="credit" rel="noopener noreferrer" target="_blank"></a>
+    </footer>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
