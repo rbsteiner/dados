@@ -1,8 +1,8 @@
 import type { Rng } from './rng';
 import { MAX_TERRITORIES, type GameMap } from './types';
 
-export const MAP_WIDTH = 28;
-export const MAP_HEIGHT = 32;
+export const MAP_WIDTH = 30;
+export const MAP_HEIGHT = 28;
 
 const MIN_TERRITORY_CELLS = 8;
 const MIN_TARGET_CELLS = 14;
