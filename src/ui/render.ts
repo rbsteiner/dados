@@ -4,8 +4,12 @@ import { colorOf } from './palette';
 
 export interface View {
   readonly selected?: TerritoryId | undefined;
-  /** Territories involved in the last Attack, briefly highlighted. */
-  readonly lastAttack?: { readonly from: TerritoryId; readonly to: TerritoryId } | undefined;
+  /** The two Territories of the Attack being played. */
+  readonly fight?: { readonly from: TerritoryId; readonly to: TerritoryId } | undefined;
+  /** Offsets of dice stacks, in units of the cell radius (jolts, shakes, bounces). */
+  readonly shift?: ReadonlyMap<TerritoryId, Point> | undefined;
+  /** A Territory flashing toward white; amount from 0 (none) to 1. */
+  readonly flash?: { readonly territory: TerritoryId; readonly amount: number } | undefined;
 }
 
 const BORDER = '#0b0c0f';
@@ -18,12 +22,14 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, layout: 
 
   const highlighted = new Set<TerritoryId>();
   if (view.selected !== undefined) highlighted.add(view.selected);
-  if (view.lastAttack) highlighted.add(view.lastAttack.from).add(view.lastAttack.to);
+  if (view.fight) highlighted.add(view.fight.from).add(view.fight.to);
 
   // Each Territory is filled as one shape, so no seams show between its cells.
   for (const territory of state.territories) {
     const base = colorOf(state.players[territory.owner]!.color);
-    ctx.fillStyle = highlighted.has(territory.id) ? mix(base, '#000000', 0.45) : base;
+    let fill = highlighted.has(territory.id) ? mix(base, '#000000', 0.45) : base;
+    if (view.flash?.territory === territory.id) fill = mix(fill, '#ffffff', view.flash.amount * 0.7);
+    ctx.fillStyle = fill;
     ctx.beginPath();
     for (const cell of territory.cells) addPolygon(ctx, layout.corners(cell));
     ctx.fill();
@@ -37,7 +43,12 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, layout: 
 
   // Dice last, top to bottom, so lower stacks overlap the ones behind them.
   const stacks = state.territories
-    .map((t) => ({ at: layout.anchor(t), dice: t.dice, color: colorOf(state.players[t.owner]!.color) }))
+    .map((t) => {
+      const anchor = layout.anchor(t);
+      const shift = view.shift?.get(t.id) ?? { x: 0, y: 0 };
+      const at = { x: anchor.x + shift.x * layout.radius, y: anchor.y + shift.y * layout.radius };
+      return { at, dice: t.dice, color: colorOf(state.players[t.owner]!.color) };
+    })
     .sort((a, b) => a.at.y - b.at.y);
   for (const s of stacks) drawDice(ctx, s.at, s.dice, s.color, layout.radius);
 }

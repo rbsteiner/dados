@@ -1,15 +1,28 @@
-import { attack, attackRefusal, currentPlayer, type AttackResult } from './game/attack';
+import { attack, attackRefusal, currentPlayer } from './game/attack';
 import { computerMove } from './game/computer';
 import { endTurn, largestGroup } from './game/endTurn';
 import { newGame } from './game/newGame';
 import { gameOutcome } from './game/outcome';
 import { MAX_PLAYERS, MIN_PLAYERS, type GameState, type TerritoryId } from './game/types';
+import { DiceBar } from './ui/diceBar';
 import { HexLayout } from './ui/geometry';
-import { PALETTE, colorOf, textOn } from './ui/palette';
+import { PALETTE, colorOf } from './ui/palette';
 import { render, type View } from './ui/render';
 import { STRINGS } from './ui/strings';
 
-const COMPUTER_ATTACK_DELAY_MS = 600;
+interface BattleTiming {
+  /** The attacking stack jolts toward its target. */
+  readonly clashMs: number;
+  /** Dice tumble in the bar. */
+  readonly rollMs: number;
+  /** Dice stop one by one. */
+  readonly revealMs: number;
+  /** Capture flash and bounce, or the failed attacker's shake. */
+  readonly resultMs: number;
+}
+
+const HUMAN_BATTLE: BattleTiming = { clashMs: 200, rollMs: 600, revealMs: 400, resultMs: 400 };
+const COMPUTER_BATTLE: BattleTiming = { clashMs: 0, rollMs: 300, revealMs: 0, resultMs: 300 };
 const DEFAULT_PLAYER_COUNT = 7;
 
 function element<T extends HTMLElement>(id: string): T {
@@ -43,6 +56,9 @@ const ui = {
 let game: GameState | undefined;
 let layout: HexLayout | undefined;
 let view: View = {};
+/** True while a battle is being shown; the Human can't act meanwhile. */
+let animating = false;
+const diceBar = new DiceBar(ui.diceBar);
 /** Bumped on every new game so a running Computer turn loop from the previous game stops. */
 let session = 0;
 
@@ -114,7 +130,8 @@ function startGame(playerCount: number, humanColor: number, gameCode = randomGam
   session++;
   game = newGame({ playerCount, humanColor, gameCode });
   view = {};
-  ui.diceBar.replaceChildren();
+  animating = false;
+  diceBar.clear();
   ui.startScreen.hidden = true;
   ui.gameScreen.hidden = false;
   resize();
@@ -131,12 +148,8 @@ async function continueTurns(): Promise<void> {
 
     const { move, state } = computerMove(game);
     if (move.type === 'attack') {
-      const { state: next, result } = attack(state, move.from, move.to);
-      showRolls(state, result);
-      game = next;
-      view = { lastAttack: result };
-      refresh();
-      await delay(COMPUTER_ATTACK_DELAY_MS);
+      game = state;
+      await battle(move.from, move.to, COMPUTER_BATTLE);
     } else {
       game = endTurn(state).state;
       view = {};
@@ -144,8 +157,91 @@ async function continueTurns(): Promise<void> {
   }
 }
 
+/**
+ * Resolves an Attack on the current game and shows it: clash, tumbling dice, reveal, then the
+ * capture (flash and bounce) or the failure (shake). The game only changes once the dice are shown.
+ */
+async function battle(from: TerritoryId, to: TerritoryId, timing: BattleTiming): Promise<void> {
+  if (!game || !layout) return;
+  const mySession = session;
+  const alive = () => mySession === session;
+  const before = game;
+  const { state: after, result } = attack(before, from, to);
+  const fight = { from, to };
+  const ownerColor = (t: TerritoryId) => colorOf(before.players[before.territories[t]!.owner]!.color);
+
+  animating = true;
+  try {
+    const a = layout.anchor(before.territories[from]!);
+    const b = layout.anchor(before.territories[to]!);
+    const length = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const toward = { x: (b.x - a.x) / length, y: (b.y - a.y) / length };
+
+    await animate(timing.clashMs, alive, (t) => {
+      const push = Math.sin(Math.PI * t) * 0.6;
+      view = { fight, shift: new Map([[from, { x: toward.x * push, y: toward.y * push }]]) };
+    });
+    if (!alive()) return;
+    view = { fight };
+    refresh();
+
+    await diceBar.roll(
+      { color: ownerColor(from), values: result.attacker },
+      { color: ownerColor(to), values: result.defender },
+      { rollMs: timing.rollMs, revealMs: timing.revealMs },
+      alive,
+    );
+    if (!alive()) return;
+
+    game = after;
+    diceBar.showWinner(result.captured);
+    await animate(timing.resultMs, alive, (t) =>
+      (view = result.captured
+        ? { fight, flash: { territory: to, amount: 1 - t }, shift: new Map([[to, { x: 0, y: bounce(t) }]]) }
+        : { fight, shift: new Map([[from, { x: shake(t), y: 0 }]]) }),
+    );
+    if (!alive()) return;
+    view = {};
+    refresh();
+  } finally {
+    if (alive()) {
+      animating = false;
+      refresh();
+    }
+  }
+}
+
+/** Runs `frame` on every animation frame for `ms`, redrawing the map each time. */
+function animate(ms: number, alive: () => boolean, frame: (t: number) => void): Promise<void> {
+  if (ms <= 0) return Promise.resolve();
+  return new Promise((resolve) => {
+    const start = performance.now();
+    const step = (now: number) => {
+      if (!alive()) return resolve();
+      const t = Math.min(1, (now - start) / ms);
+      frame(t);
+      refresh();
+      if (t < 1) requestAnimationFrame(step);
+      else resolve();
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+/** Vertical offset of the conquering stack dropping in: from 1.5 cells above, bouncing once. */
+function bounce(t: number): number {
+  const fall = t < 0.6 ? t / 0.6 : 1;
+  const hop = t < 0.6 ? 0 : Math.sin(((t - 0.6) / 0.4) * Math.PI) * 0.35;
+  return -1.5 * (1 - fall * fall) - hop;
+}
+
+/** Horizontal offset of a failed attacker shaking, fading out. */
+function shake(t: number): number {
+  return Math.sin(t * Math.PI * 8) * 0.35 * (1 - t);
+}
+
 function onBoardClick(event: MouseEvent): void {
-  if (!game || !layout || gameOutcome(game) !== 'playing') return;
+  if (animating || !game || !layout || gameOutcome(game) !== 'playing') return;
   if (game.players[currentPlayer(game)]!.kind !== 'human') return;
 
   const rect = ui.canvas.getBoundingClientRect();
@@ -166,22 +262,21 @@ function selectOrAttack(clicked: TerritoryId): void {
   } else if (territory.owner === human) {
     view = territory.dice >= 2 ? { selected: clicked } : {};
   } else if (view.selected !== undefined && attackRefusal(game, view.selected, clicked) === undefined) {
-    const { state, result } = attack(game, view.selected, clicked);
-    showRolls(game, result);
-    game = state;
-    view = { lastAttack: result };
-    if (gameOutcome(game) !== 'playing') {
-      refresh();
-      return showEnd();
-    }
+    void humanAttack(view.selected, clicked);
+    return;
   }
   refresh();
+}
+
+async function humanAttack(from: TerritoryId, to: TerritoryId): Promise<void> {
+  await battle(from, to, HUMAN_BATTLE);
+  if (game && gameOutcome(game) !== 'playing') showEnd();
 }
 
 ui.canvas.addEventListener('click', onBoardClick);
 
 ui.endTurn.addEventListener('click', () => {
-  if (!game || game.players[currentPlayer(game)]!.kind !== 'human') return;
+  if (animating || !game || game.players[currentPlayer(game)]!.kind !== 'human') return;
   game = endTurn(game).state;
   view = {};
   void continueTurns();
@@ -201,7 +296,7 @@ function refresh(): void {
   if (ctx) render(ctx, game, layout, view);
   renderPlayerBar(game);
   const humanTurn = game.players[currentPlayer(game)]!.kind === 'human';
-  ui.endTurn.disabled = !humanTurn || gameOutcome(game) !== 'playing';
+  ui.endTurn.disabled = animating || !humanTurn || gameOutcome(game) !== 'playing';
   ui.status.textContent = humanTurn ? STRINGS.yourTurn : STRINGS.computerTurn(playerName(game, currentPlayer(game)));
 }
 
@@ -242,39 +337,6 @@ function renderPlayerBar(state: GameState): void {
   ui.playerBar.replaceChildren(...items);
 }
 
-/** Shows both sides' dice, coloured by their owners before the Attack. */
-function showRolls(before: GameState, result: AttackResult): void {
-  const ownerColor = (t: TerritoryId) => colorOf(before.players[before.territories[t]!.owner]!.color);
-  const attackerColor = ownerColor(result.from);
-  const defenderColor = ownerColor(result.to);
-
-  const side = (values: readonly number[], color: string, won: boolean) => {
-    const el = document.createElement('div');
-    el.className = 'side';
-    for (const v of values) {
-      const die = document.createElement('span');
-      die.className = 'die';
-      die.style.background = color;
-      die.style.color = textOn(color);
-      die.textContent = String(v);
-      el.append(die);
-    }
-    const total = document.createElement('span');
-    total.className = won ? 'total won' : 'total';
-    total.textContent = String(values.reduce((a, b) => a + b, 0));
-    el.append(total);
-    return el;
-  };
-
-  const vs = document.createElement('span');
-  vs.textContent = 'vs';
-  ui.diceBar.replaceChildren(
-    side(result.attacker, attackerColor, result.captured),
-    vs,
-    side(result.defender, defenderColor, !result.captured),
-  );
-}
-
 function resize(): void {
   if (!game) return;
   const rect = ui.board.getBoundingClientRect();
@@ -298,10 +360,6 @@ function watchPixelRatio(): void {
   );
 }
 watchPixelRatio();
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 buildStartScreen();
 

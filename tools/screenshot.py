@@ -32,11 +32,18 @@ def main() -> None:
                 continue
             attack = page.evaluate(FIND_ATTACK)
             if attack:
-                for i, (tid, name) in enumerate(zip(attack, ("3-selected", "4-fight"))):
-                    pt = page.evaluate(f"window.__dados.territoryPoint({tid})")
-                    page.mouse.click(pt["x"], pt["y"])
-                    page.wait_for_timeout(150)
-                    page.screenshot(path=f"/screenshots/{scheme}-{name}.png")
+                source, target = (page.evaluate(f"window.__dados.territoryPoint({t})") for t in attack)
+                page.mouse.click(source["x"], source["y"])
+                page.wait_for_timeout(150)
+                page.screenshot(path=f"/screenshots/{scheme}-3-selected.png")
+                # Battle phases: clash, rolling, reveal, result, back to normal (ms after the click).
+                page.mouse.click(target["x"], target["y"])
+                elapsed = 0
+                for at, name in ((100, "4a-clash"), (500, "4b-rolling"), (1000, "4c-reveal"),
+                                 (1350, "4d-result"), (1900, "4e-after")):
+                    page.wait_for_timeout(at - elapsed)
+                    elapsed = at
+                    page.screenshot(path=f"/screenshots/{scheme}-{name}.png", animations="allow")
             page.close()
         browser.close()
 
