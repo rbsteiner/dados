@@ -4,7 +4,8 @@ A browser game of territory conquest with dice, inspired by
 [Dice Wars by GAMEDESIGN](https://www.gamedesign.jp/games/dicewars/).
 The rules are reimplemented from scratch; no code or artwork from the original is used.
 
-The game's vocabulary is defined in [CONTEXT.md](CONTEXT.md).
+The game's vocabulary is defined in [CONTEXT.md](CONTEXT.md). Project status, decisions and next steps
+are in [docs/HANDOFF.md](docs/HANDOFF.md).
 
 ## Development
 
