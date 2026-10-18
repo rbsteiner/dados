@@ -1,7 +1,10 @@
 /** Every piece of on-screen text, kept in one place so other languages can be added. */
 export const STRINGS = {
   title: 'Proyecto Dados Clonados Belicosos',
-  credit: 'Inspired by Dice Wars by GAMEDESIGN',
+  /** Footer credit: before + linked game name + after. */
+  creditBefore: 'A fan-made clone of ',
+  creditLink: 'Dice Wars',
+  creditAfter: ' by GAMEDESIGN, with a few extras I missed. Not affiliated with GAMEDESIGN.',
   creditUrl: 'https://www.gamedesign.jp/games/dicewars/',
   players: 'Players',
   yourColor: 'Your color',

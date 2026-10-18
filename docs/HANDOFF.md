@@ -83,7 +83,7 @@ tools/             Dev-only Playwright screenshot tool (own Docker image, never 
 - **Map:** 30×28 grid (our own size), 30–31 territories, each starting from a 7-cell core.
 - **Visual style:** flat cartoon, thick near-black outlines. The fight is shown as darkened territories with a red outline. Light comes from the upper left.
 - **Battle timing:** Human 200 ms clash, 600 ms roll, 400 ms reveal, 400 ms result. Computer 300 ms roll, 300 ms result.
-- **Title and credit:** "Proyecto Dados Clonados Belicosos", with the footer credit "Inspired by Dice Wars by GAMEDESIGN". The name "Dice Wars" is never used as our title.
+- **Title and credit:** "Proyecto Dados Clonados Belicosos", with the footer credit "A fan-made clone of Dice Wars by GAMEDESIGN, with a few extras I missed. Not affiliated with GAMEDESIGN." (only "Dice Wars" is a link). The README explains the why: a personal project to add missing features. The name "Dice Wars" is never used as our title.
 - **Node:** LTS only. Dependabot ignores major Node bumps. **Node 22 reaches end of life in April 2027: move the Dockerfile, compose and CI to 24-alpine by hand before then.**
 
 ## Security posture

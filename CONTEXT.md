@@ -1,6 +1,6 @@
 # Proyecto Dados Clonados Belicosos
 
-A turn-based territory-conquest game, inspired by Dice Wars by GAMEDESIGN, played on a map of territories, where armies of dice attack neighbouring territories. One human plays against computer opponents.
+A turn-based territory-conquest game, a fan-made clone of Dice Wars by GAMEDESIGN, played on a map of territories, where armies of dice attack neighbouring territories. One human plays against computer opponents.
 
 ## Language
 
@@ -99,5 +99,5 @@ How well the **Computers** play: Easy, Normal or Hard. Normal reproduces the ori
 
 ## Flagged ambiguities
 
-- The project is called **Proyecto Dados Clonados Belicosos**; "Dice Wars" refers only to the original game that inspired it.
+- The project is called **Proyecto Dados Clonados Belicosos**; "Dice Wars" refers only to the original game it clones.
 - The original game calls Territories "areas" (エリア). In this project we use **Territory**.

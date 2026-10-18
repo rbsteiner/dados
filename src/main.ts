@@ -50,7 +50,9 @@ const ui = {
   endDialog: element<HTMLDialogElement>('end-dialog'),
   endMessage: element('end-message'),
   newGame: element<HTMLButtonElement>('new-game'),
+  creditBefore: element<HTMLSpanElement>('credit-before'),
   credit: element<HTMLAnchorElement>('credit'),
+  creditAfter: element<HTMLSpanElement>('credit-after'),
 };
 
 let game: GameState | undefined;
@@ -72,7 +74,9 @@ function buildStartScreen(): void {
   ui.playButton.textContent = STRINGS.play;
   ui.endTurn.textContent = STRINGS.endTurn;
   ui.newGame.textContent = STRINGS.newGame;
-  ui.credit.textContent = STRINGS.credit;
+  ui.creditBefore.textContent = STRINGS.creditBefore;
+  ui.credit.textContent = STRINGS.creditLink;
+  ui.creditAfter.textContent = STRINGS.creditAfter;
   ui.credit.href = STRINGS.creditUrl;
 
   for (let n = MIN_PLAYERS; n <= MAX_PLAYERS; n++) {

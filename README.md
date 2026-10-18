@@ -1,7 +1,15 @@
 # Proyecto Dados Clonados Belicosos
 
-A browser game of territory conquest with dice, inspired by
-[Dice Wars by GAMEDESIGN](https://www.gamedesign.jp/games/dicewars/).
+I loved [Dice Wars by GAMEDESIGN](https://www.gamedesign.jp/games/dicewars/) and missed a few
+features, so I built this clone as a personal project. Not affiliated with GAMEDESIGN.
+
+The things I wanted to add:
+
+- choosing my own colour;
+- playing on my iPhone, also offline from the Home Screen;
+- a Game Code to replay the same map, a speed setting and autosave;
+- an easier and a harder Computer, as an excuse to learn how artificial players work.
+
 The rules are reimplemented from scratch; no code or artwork from the original is used.
 
 The game's vocabulary is defined in [CONTEXT.md](CONTEXT.md). Project status, decisions and next steps
