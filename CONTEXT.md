@@ -42,7 +42,10 @@ A number that fully determines a game: its **Map**, starting **Dice**, **Turn Or
 _Avoid_: Seed (in user-facing text)
 
 **Turn Order**:
-The random order, fixed at the start of the game, in which **Players** take turns.
+The random order, fixed at the start of the game, in which **Players** take turns. As in the original, going first is not compensated (it is a clear advantage with 2–3 Players, and negligible with 5 or more).
+
+**Starting Dice**:
+How **Dice** are placed when a game begins, as in the original: every **Territory** gets 1 Die, then 2 extra Dice per Territory on the **Map** are dealt one at a time to the **Players** in rotation, the **Human** first. A Player with more Territories never starts with fewer Dice.
 
 **Eliminated**:
 A **Player** who owns no **Territories**. Eliminated Players are skipped in the **Turn Order**.

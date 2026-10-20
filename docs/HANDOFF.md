@@ -1,6 +1,6 @@
 # Handoff — Proyecto Dados Clonados Belicosos
 
-Last updated: 2026-10-17. Read this first, then [CONTEXT.md](../CONTEXT.md) (the domain glossary; use its terms in code, tests and conversation).
+Last updated: 2026-10-20. Read this first, then [CONTEXT.md](../CONTEXT.md) (the domain glossary; use its terms in code, tests and conversation).
 
 ## What this is
 
@@ -20,7 +20,7 @@ A browser clone of the rules of Dice Wars (GAMEDESIGN), written from scratch: on
 | 4 | Easy Computer | Planned |
 | 5 | Hard Computer (modern non-LLM approaches, to explore) | Planned |
 
-The owner said they want "some tweaks" before iteration 2. **Ask what they are before starting anything.**
+Tweaks before iteration 2: the credit wording (done) and the difficulty (Starting Dice now match the original; the owner is play-testing). **Ask whether more tweaks are wanted before starting iteration 2.**
 
 ## How the owner wants to work
 
@@ -46,6 +46,7 @@ docker compose exec app npm test                       # tests (use exec, not ru
 docker compose exec app npm run lint
 docker compose exec app npm run typecheck
 docker compose exec app npm run build
+docker compose exec app npm run simulate               # balance check: 1000 Computer-only games per player count (~1 min)
 docker compose --profile tools run --rm screenshot     # screenshots into ./screenshots (git-ignored)
 ```
 
@@ -63,6 +64,7 @@ src/game/          Pure game logic, no DOM. Every function takes a GameState and
   outcome.ts       'playing' | 'won' | 'lost' (lost as soon as the Human is eliminated)
   testing.ts       makeGame()/line() helpers for hand-built test positions
   *.test.ts        Vitest; fullGame.test.ts plays whole games checking invariants after every move
+  balance.sim.ts   On-demand balance simulation (npm run simulate): wins by seat and by Turn Order position
 src/ui/            Display only
   geometry.ts      HexLayout: cell <-> pixel, dice anchor (most interior cell), headroom above map
   render.ts        Canvas drawing: territories, borders, fight outline, dice piles, shadows, pips
@@ -77,7 +79,8 @@ tools/             Dev-only Playwright screenshot tool (own Docker image, never 
 
 ## Decisions already made (don't reopen without the owner)
 
-- **Rules:** identical to the original. Max 8 dice per territory. The attacker needs ≥2 dice and an adjacent enemy territory; ties go to the defender. A capture moves all dice but one. Reinforcement equals the Largest Group, and Stock is capped at 64. Turn order is random, and the starting dice total is equal for every player.
+- **Rules:** identical to the original. Max 8 dice per territory. The attacker needs ≥2 dice and an adjacent enemy territory; ties go to the defender. A capture moves all dice but one. Reinforcement equals the Largest Group, and Stock is capped at 64. Turn order is random and not compensated, like the original.
+- **Starting Dice (changed 2026-10-20, checked against the original's public game script):** 1 die per territory, then 2 extra dice per territory dealt one at a time in rotation, the Human first. Territories are also dealt in rotation, Human first. We used to give every player the same dice total, which made whoever got an extra territory weaker (thinner dice); the Human always got it, so their seat won ~10% instead of ~14% at 7 players. The owner, who wins 9/10 in the original, had won 1/15 in ours. After the change (`npm run simulate`, 1000 games), the Human's seat wins 11.9% at 7 players and 28.9% at 3 (fair: 14.3% and 33.3%). That is still a bit low, but other seats spread as widely, and the original deals the same way. In 2000-game runs with a smarter bot in the Human's seat, it won 26% instead of 19%, and was knocked out within 3 turns 9% of the time instead of 13%.
 - **Normal Computer:** if some player holds more than 40% of all dice, only attacks involving that player are considered. It never attacks a territory with more dice. On equal dice it attacks if either side leads (ties for the lead count), otherwise 90% of the time. It picks a random acceptable attack, or ends its turn. The original's buggy ranking is deliberately fixed.
 - **Game Code** = 32-bit seed; the same code and the same choices replay the same game.
 - **Map:** 30×28 grid (our own size), 30–31 territories, each starting from a 7-cell core.

@@ -12,6 +12,7 @@
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
     "test:watch": "vitest",
+    "simulate": "vitest run --mode simulate",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },

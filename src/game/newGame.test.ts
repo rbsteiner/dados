@@ -106,18 +106,36 @@ describe('newGame setup', () => {
     expect(Math.min(...counts)).toBeGreaterThan(0);
   });
 
-  it.each(cases)('gives every Player the same total Dice, 1 to 8 per Territory ($playerCount players, code $gameCode)', (c) => {
+  it.each(cases)('deals 2 extra Dice per Territory in rotation, the Human first ($playerCount players, code $gameCode)', (c) => {
     const game = newGame({ ...base, ...c });
     for (const t of game.territories) {
       expect(t.dice).toBeGreaterThanOrEqual(1);
       expect(t.dice).toBeLessThanOrEqual(8);
     }
-    const totals = game.players.map((p) =>
-      game.territories.filter((t) => t.owner === p.id).reduce((n, t) => n + t.dice, 0),
+    const all = game.territories.reduce((n, t) => n + t.dice, 0);
+    expect(all).toBe(3 * game.territories.length);
+    // Extra Dice = Dice beyond the 1 every Territory starts with. Dealt one at a time in Player order,
+    // so they differ by at most 1, and earlier Players (the Human first) get the leftovers.
+    const extras = game.players.map((p) =>
+      game.territories.filter((t) => t.owner === p.id).reduce((n, t) => n + t.dice - 1, 0),
     );
-    expect(new Set(totals).size).toBe(1);
-    // Roughly 3 Dice per Territory on average, like the original.
-    expect(totals[0]! * game.players.length).toBeGreaterThan(game.territories.length * 2);
+    expect(Math.max(...extras) - Math.min(...extras)).toBeLessThanOrEqual(1);
+    for (let p = 1; p < extras.length; p++) expect(extras[p]!).toBeLessThanOrEqual(extras[p - 1]!);
+  });
+
+  it('never gives a Player with more Territories fewer Dice', () => {
+    for (const playerCount of [3, 5, 7, 8]) {
+      for (const gameCode of codes) {
+        const game = newGame({ ...base, playerCount, gameCode });
+        const stats = game.players.map((p) => {
+          const own = game.territories.filter((t) => t.owner === p.id);
+          return { territories: own.length, dice: own.reduce((n, t) => n + t.dice, 0) };
+        });
+        for (const a of stats) for (const b of stats) {
+          if (a.territories > b.territories) expect(a.dice).toBeGreaterThanOrEqual(b.dice);
+        }
+      }
+    }
   });
 
   it('starts with a Turn Order containing every Player once', () => {

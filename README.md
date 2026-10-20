@@ -25,6 +25,7 @@ DEV_HOST=0.0.0.0 docker compose up             # also reachable from your phone 
 docker compose run --rm app npm test           # tests
 docker compose run --rm app npm run lint       # lint
 docker compose run --rm app npm run build      # production build in dist/
+docker compose run --rm app npm run simulate   # balance check: Computers play each other (~1 min)
 ```
 
 While `docker compose up` is running, use `docker compose exec app npm test` instead of `run`:

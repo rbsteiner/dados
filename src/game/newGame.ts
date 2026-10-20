@@ -81,17 +81,17 @@ function dealTerritories(territoryCount: number, playerCount: number, rng: Rng):
   return owners;
 }
 
-/** Every Territory gets 1 Die, then each Player's extra Dice land randomly until all Players have the same total. */
+/**
+ * Like the original: every Territory gets 1 Die, then 2 extra Dice per Territory on the Map are dealt
+ * one at a time to the Players in rotation, the Human first, each landing on a random Territory of
+ * that Player with room. A Player with more Territories therefore never starts with fewer Dice.
+ */
 function dealStartingDice(owners: readonly PlayerId[], playerCount: number, rng: Rng): number[] {
   const dice = owners.map(() => 1);
-  const total = Math.floor((STARTING_DICE_PER_TERRITORY * owners.length) / playerCount);
-  for (let player = 0; player < playerCount; player++) {
-    const own = owners.flatMap((o, t) => (o === player ? [t] : []));
-    for (let placed = own.length; placed < total; placed++) {
-      const open = own.filter((t) => dice[t]! < MAX_DICE);
-      const t = open[rng.int(open.length)]!;
-      dice[t]!++;
-    }
+  const extra = (STARTING_DICE_PER_TERRITORY - 1) * owners.length;
+  for (let i = 0, player = 0; i < extra; i++, player = (player + 1) % playerCount) {
+    const open = owners.flatMap((o, t) => (o === player && dice[t]! < MAX_DICE ? [t] : []));
+    if (open.length > 0) dice[open[rng.int(open.length)]!]!++;
   }
   return dice;
 }
